@@ -4,12 +4,12 @@ from stepper.bipolar import BipolarStepper
 print('test module stepper')
 bp = BipolarStepper(speed='medium')   
 
-print('move 100 steps forward, speed medium') 
+print('move 200 steps forward, speed medium') 
 bp.next_steps(200)
 bp.sleep()
 utime.sleep(0.5)
 
-print('move 50 steps backward highest speed')
+print('move 100 steps backward highest speed')
 bp.set_direction('backward')            
 bp.set_speed('high')            
 bp.next_steps(100)
