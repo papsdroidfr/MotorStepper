@@ -47,43 +47,51 @@ class BipolarStepper():
         self._pinout = Pinout(pin1,pin2,pin3,pin4)
         
         #speed motor: delays between 2 steps
-        self._speed = {'high': 0.005,   # 5ms delay between 2 steps
+        self._speed = {'high': 0.003,   # 3ms delay between 2 steps
                       'medium': 0.008,  # 8ms delay between 2 steps
                       'low': 0.016,     # 16ms delay between 2 steps
                       'test':0.5,       # 0.5s delay between 2 steps, for testing activity
                       }
         self.set_speed(speed)
-        
-        #direction forward or backward
-        self._dic_direction = { 'forward':1, 'backward':-1 }
-        self.set_direction(direction)
-        
+              
         self._steps360 = steps360
  
-        # sequences to run in circle for A+, B+, A-, B-
-        self._full_step_seq = [ 
-            [1,1,0,0],  
-            [0,1,1,0],  
-            [0,0,1,1], 
-            [1,0,0,1],
-        ] 
-        self._seq = 0   # current sequence: 0,1,2,3
+        #binary state for pinout A+, B+, A-, B-
+        self._step_state = 0b1100
         
-        #init motor with first position seq 0
+        #direction forward or backward
+        self._dic_direction = { 'forward':self._forward_step, 'backward':self._backward_step }
+        self.set_direction(direction) 
+        
+        #init motor with first step_state
         print('init motor')
-        self._move_motor()
-        utime.sleep(0.5)
+        self.sleep()
 
     # Private methods
     # -------------------------------------------------
+    def _forward_step(self)->None:
+        """"move forward step_state in circle
+            1100 -> 0110 -> 0011 -> 1001
+        """
+        first_bit = self._step_state & 0b0001
+        self._step_state = (self._step_state >> 1) | (first_bit << 3)
+        
+    
+    def _backward_step(self)->None:
+        """"move backward step_state in circle
+            1100 -> 1001 -> 0011 -> 0110
+        """
+        last_bit = self._step_state & 0b1000
+        self._step_state = 0b1111&(self._step_state << 1) | (last_bit >> 3)
+    
     
     def _move_motor(self)->None :
         """ Move motor to curent step and wait """
         #run current sequence
-        (self.pin2).value(self._full_step_seq[self._seq][0]) # A+
-        (self.pin1).value(self._full_step_seq[self._seq][1]) # B+
-        (self.pin4).value(self._full_step_seq[self._seq][2]) # A-
-        (self.pin3).value(self._full_step_seq[self._seq][3]) # B-
+        (self.pin2).value(self._step_state & 0b1000) # A+
+        (self.pin1).value(self._step_state & 0b0100) # B+
+        (self.pin4).value(self._step_state & 0b0010) # A-
+        (self.pin3).value(self._step_state & 0b0001) # B-
         utime.sleep(self._delay)
     
 
@@ -121,15 +129,15 @@ class BipolarStepper():
     def set_direction(self, direction)->None :
         """ Set direction: 'forward' (default) or 'backward' """
         try:
-            self._direction = self._dic_direction[direction]
+            self._next_state = self._dic_direction[direction]
         except:
-            self._direction = self._dic_direction['forward']          
+            self._next_state = self._dic_direction['forward']          
     
     
     def next_steps(self, nsteps=1)->None :
         """ Move motor nsteps. """
         for _ in range(nsteps):
-            self._seq = (self._seq + self._direction)%4
+            self._next_state()
             self._move_motor()          
 
 
